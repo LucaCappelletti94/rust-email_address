@@ -262,6 +262,8 @@
 //!   legacy reasons this feature is also named `sqlx`.
 //! * **sqlx_postgres** — enables support for the PostgreSQL backend of the
 //!   [sqlx](https://crates.io/crates/sqlx) crate.
+//! * **diesel_support** — enables support for the [diesel](https://crates.io/crates/diesel) crate,
+//!   so `EmailAddress` can be used for `Text` columns and validates the values it reads.
 //! * **utoipa_support** — enables support for the [utoipa](https://crates.io/crates/utoipa) crate,
 //!   thereby allowing type-safe generation of OpenAPI documentation for the `EmailAddress` type.
 //! * **zeroize_support** — enables support for the [zeroize](https://crates.io/crates/zeroize)
@@ -294,6 +296,15 @@ use sqlx::{Database, Decode, Encode, Type, encode::IsNull, error::BoxDynError};
 #[cfg(feature = "sqlx_postgres")]
 use sqlx::postgres::{PgHasArrayType, PgTypeInfo};
 
+#[cfg(feature = "diesel")]
+use diesel::{
+    backend::Backend,
+    deserialize::{self, FromSql, FromSqlRow},
+    expression::AsExpression,
+    serialize::{self, Output, ToSql},
+    sql_types::Text,
+};
+
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -310,6 +321,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema), schema(format = Email, description = ""))]
+#[cfg_attr(feature = "diesel", derive(AsExpression, FromSqlRow), diesel(sql_type = Text))]
 pub struct EmailAddress(String);
 
 // ------------------------------------------------------------------------------------------------
@@ -536,6 +548,30 @@ where
 {
     fn array_type_info() -> PgTypeInfo {
         <String as PgHasArrayType>::array_type_info()
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl<DB> ToSql<Text, DB> for EmailAddress
+where
+    DB: Backend,
+    str: ToSql<Text, DB>,
+{
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, DB>) -> serialize::Result {
+        self.0.as_str().to_sql(out)
+    }
+}
+
+#[cfg(feature = "diesel")]
+impl<DB> FromSql<Text, DB> for EmailAddress
+where
+    DB: Backend,
+    String: FromSql<Text, DB>,
+{
+    fn from_sql(bytes: DB::RawValue<'_>) -> deserialize::Result<Self> {
+        let address = String::from_sql(bytes)?;
+        validate_address(&address, Default::default())?;
+        Ok(Self(address))
     }
 }
 
@@ -809,6 +845,11 @@ fn is_uri_reserved(c: char) -> bool {
 }
 
 fn parse_address(address: &str, options: Options) -> Result<EmailAddress, Error> {
+    validate_address(address, options)?;
+    Ok(EmailAddress(address.to_owned()))
+}
+
+fn validate_address(address: &str, options: Options) -> Result<(), Error> {
     //
     // Deals with cases of '@' in `local-part`, if it is quoted they are legal, if
     // not then they'll return an `InvalidCharacter` error later.
@@ -824,8 +865,7 @@ fn parse_address(address: &str, options: Options) -> Result<EmailAddress, Error>
         (true, true, false) => Err(Error::InvalidCharacter),
         _ => {
             parse_local_part(local_part, options)?;
-            parse_domain(domain, options)?;
-            Ok(EmailAddress(address.to_owned()))
+            parse_domain(domain, options)
         }
     }
 }

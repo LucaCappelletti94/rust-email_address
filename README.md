@@ -71,6 +71,9 @@ assert_eq!(
   crate. For legacy reasons this feature is also named `sqlx`.
 * **sqlx_postgres** — enables support for the PostgreSQL backend of the
   [sqlx](https://crates.io/crates/sqlx) crate.
+* **diesel_support** — enables support for the
+  [diesel](https://crates.io/crates/diesel) crate, so `EmailAddress` can be used
+  for `Text` columns and validates the values it reads.
 * **utoipa_support** — enables support for the
   [utoipa](https://crates.io/crates/utoipa) crate, thereby allowing type-safe
   generation of OpenAPI documentation for the `EmailAddress` type.

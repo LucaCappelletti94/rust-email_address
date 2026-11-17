@@ -94,7 +94,7 @@ jobs:
     needs: [rustfmt, clippy]
     strategy:
       matrix:
-        features: ["", "--features serde_support"]
+        features: ["", "--features serde_support", "--features diesel_support"]
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository

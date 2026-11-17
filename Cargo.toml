@@ -14,8 +14,9 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
 default = ["std", "serde_support"]
-std = ["serde?/std"]
+std = ["diesel?/std", "serde?/std"]
 serde_support = ["serde"]
+diesel_support = ["diesel"]
 sqlx = ["sqlx_support"]
 sqlx_support = ["dep:sqlx"]
 sqlx_postgres = ["sqlx", "sqlx/postgres"]
@@ -25,11 +26,14 @@ zeroize_support = ["zeroize"]
 [dependencies]
 serde = { optional = true, version = "1.0", default-features = false }
 sqlx = { optional = true, version = "0.9" }
+diesel = { optional = true, version = "2.4", default-features = false }
 utoipa = { optional = true, version = "6.0" }
 zeroize = { optional = true, version = "1.9", features = ["zeroize_derive"] }
 
 [dev-dependencies]
 claims = "0.8.0"
+diesel = { version = "2.4", default-features = false, features = ["sqlite"] }
+libsqlite3-sys = { version = "0.37", features = ["bundled"] }
 serde_assert = "0.8.0"
 sqlx-core = "0.9"
 
